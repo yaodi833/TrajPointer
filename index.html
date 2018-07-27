@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="http://maps.googleapis.com/maps/api/js?key=AIzaSyCBLnec7vCM3J-LxPkTl_MsxQp1MjuzZdU&sensor=false&language=en">
+</script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<style type="text/css">
+	body,html {height:  100%; width: 100%; margin: 0;}
+</style>
+</head>
+
+<body>
+
+<select id="anchor", name = "anchor">
+</select>
+
+<select id="top_result" , name = "result">
+    <option value="anchor">anchor</option>
+    <option value="0">0</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+</select>
+
+<button onClick="init()">Init </button>
+<button onClick="test()">Check </button>
+<label id = "info"></label>
+
+
+<div id="googleMap" style="width:100%;height:95%;"></div>
+
+<script>
+
+    var map;
+    var items = new Object();
+    var currentInfoWindow;
+
+
+
+    function GetRequest() {
+      var url = location.search; //获取url中"?"符后的字串
+       var theRequest = new Object();
+       if (url.indexOf("?") != -1) {
+          var str = url.substr(1);
+          strs = str.split("&");
+          for(var i = 0; i < strs.length; i ++) {
+             theRequest[strs[i].split("=")[0]]=(strs[i].split("=")[1]);
+          }
+       }
+       return theRequest;
+    }
+
+    function initialize()
+    {
+        //Map properties
+        var mapProp = {
+        center:new google.maps.LatLng(34,-100),
+        zoom:4
+//        mapTypeId:google.maps.MapTypeId.roadmap
+        };
+        //Create a new map
+        map=new google.maps.Map(document.getElementById("googleMap"),mapProp);
+    }
+
+    google.maps.event.addDomListener(window, 'load', initialize);
+
+    var icon_size = 4;
+
+    var symbolOne = {
+        path: 'M -2,0 0,-2 2,0 0,2 z',
+        strokeColor: '#15ff07',
+        fillColor: '#15ff07',
+        fillOpacity: 1,
+        scale: icon_size
+    };
+
+    var symbolThree = {
+        path: google.maps.SymbolPath.CIRCLE,
+        strokeColor: '#ff09f5',
+        fillColor: '#ff09f5',
+        fillOpacity: 1,
+        strokeWeight: 4,
+        scale: icon_size*2
+    };
+
+    var start_label = {
+        color:'b',
+        fontSize:6,
+        fontWeight:4,
+        text:"Start"
+    };
+
+    var end_label = {
+        color:'b',
+        fontSize:6,
+        fontWeight:4,
+        text:"End"
+    };
+
+    function readData(trajind)
+    {
+//        trajind = GetRequest();
+        console.log("this is all trajs");
+        console.log(trajind["anchor"]);
+        console.log(trajind["type"]);
+        var dir_name = "./trajs/"+trajind["anchor"]+"/";
+
+        var visibleUrllist = [trajind["type"]];
+//        'result_0','result_1','result_2','result_3','result_4','search_search',
+//                              'test_0','test_1','test_2','test_3','test_4'];
+        for (var i = visibleUrllist.length - 1; i >= 0; i--) {
+            var visibleUrl = dir_name+visibleUrllist[i];
+            console.log('Ok');
+            $.getJSON(visibleUrl, function(data) {
+                // Plot lines
+                data.ships.forEach(function(route) {
+                    console.log(visibleUrl);
+                    console.log('Adding: ' + route.id);
+                    console.log('Adding: ' + route.maskpos);
+                    console.log('Adding: ' + route.prob);
+                    console.log('Adding: ' + route.stop);
+                    document.getElementById("info").innerHTML =
+                        "Trajectory Information:--------"+route.id +"--------"+route.maskpos+"--------"+route.prob+"";
+                    //data.ships.forEach(function(ship)
+
+                    var flightPlanCoordinates = new Array(route.pos.length);
+                    for(var i = 0, l = route.pos.length; i < l; i++)
+                    {
+                        if (i==0) {
+                            flightPlanCoordinates[i] = new google.maps.LatLng(route.pos[i].lat, route.pos[i].lon);}
+                        else{
+                            flightPlanCoordinates[i] = new google.maps.LatLng(route.pos[i].lat, route.pos[i].lon);
+                        }
+                        // if (true) {};
+                        // flightPlanCoordinates[i] = new google.maps.LatLng(route.pos[i].lat, route.pos[i].lon);
+                // console.log ('Adding: '+route.pos[i].lat)
+                    }
+                    /*route.pos.forEach(function(position){
+                        flightPlanCoordinates.push(new google.maps.LatLng(position.lat, position.lon));
+                        console.log('Adding: ' + position.lat);
+                    });*/
+                    if (route.stop == 0)
+                    {
+                        // color = "#FF0000"
+    //                    color = "#9900ff"
+                        color = "#4242f4"
+                    }
+                    else if  (route.stop == 1){
+                        color = "#006600"
+                    }
+                    else
+                    {
+                        color = "#4242f4"
+                    }
+                    var flightPath = new google.maps.Polyline({
+                            path: flightPlanCoordinates,
+                            strokeColor: color,
+                            strokeOpacity: 1.5,
+                            strokeWeight: 3.5
+                          });
+                    flightPath.setMap(map);
+                });
+            //Plot stop points
+            data.ships.forEach(function(route) {
+                for(var i = 0, l = route.pos.length; i < l; i++){
+                    var hour =parseInt(parseInt(route.pos[i].tgap)/3600);
+                    var min = parseInt((parseInt(route.pos[i].tgap)%3600)/60);
+                    var timegap = "";
+                    if (hour == 0){
+                        timegap = min.toString()+ "min";
+                    }else{
+                        timegap = hour.toString()+" h"+ min.toString()+ "min";
+                    }
+
+//                    (parseFloat(route.pos[i].tgap) * 60).toString()
+                    contentString =  "<p><b>UserID:</b>"+ route.pos[i].userid+"</p>"
+                                    +"<p><b>Type:</b>"+ route.pos[i].category+"</p>"
+                                    +"<p><b>TimeGap:</b>"+ timegap +"</p>"
+                                    +"<p><b>Probs:</b>"+ route.prob +"</p>";
+                    console.log(contentString);
+                    var info_window = new google.maps.InfoWindow({content: contentString});
+
+                    if (route.maskpos == i){
+                        p = new google.maps.LatLng(route.pos[i].lat,route.pos[i].lon);
+                        newMarker=new google.maps.Marker({position:p, icon: symbolThree});
+
+                        newMarker.addListener('click', function(info_window, p) {
+                        return function() {
+                            np = new google.maps.LatLng(p.lat(),p.lng());
+                            info_window.open(map, newMarker);
+                            info_window.setPosition(np);
+                        }}(info_window, p));
+
+                        newMarker.setMap(map);
+
+                    }else{
+                        p = new google.maps.LatLng(route.pos[i].lat,route.pos[i].lon);
+                        newMarker=new google.maps.Marker({position:p, icon: symbolOne});
+                        info_window.setPosition(p);
+                        newMarker.addListener('click', function(info_window,p) {
+                        return function() {
+                            np = new google.maps.LatLng(p.lat(),p.lng());
+                            info_window.open(map, newMarker);
+                            info_window.setPosition(np);
+                        }}(info_window,p));
+                        newMarker.setMap(map);
+
+                    }
+                }
+
+
+                p = new google.maps.LatLng(route.pos[0].lat,route.pos[0].lon);
+                newMarker= new google.maps.Marker({ position:p, label: {text:'S',color:'yellow'}});
+                newMarker.setMap(map);
+                p = new google.maps.LatLng(route.pos[route.pos.length-1].lat,route.pos[route.pos.length-1].lon);
+                newMarker= new google.maps.Marker({ position:p, label: {text:'E',color:'black'}});
+                newMarker.setMap(map);
+            });
+
+        });
+        }
+
+    }
+
+    function test() {
+        var x = document.getElementById("anchor");
+        var y = document.getElementById("top_result");
+        var index1=document.getElementById("anchor").selectedIndex;
+        x.options[index1].selected = true;
+
+        var index2=document.getElementById("top_result").selectedIndex;
+        y.options[index2].selected = true;
+        console.log(x.value);
+        var trajind = new Object();
+        trajind["anchor"] = x.value;
+        console.log(x.value);
+        trajind["type"] = y.value;
+        console.log(y.value);
+        initialize();
+        readData(trajind);
+    }
+
+    function init() {
+        var x = document.getElementById("anchor");
+        if (x.options.length ==0){
+            var samples = "./trajs/allsamples";
+            $.getJSON(samples, function(data) {
+                console.log(data);
+                for(var i = 0, l = data.data.length; i < l; i++){
+                    var option = document.createElement("option");
+                    option.text = data.data[i].anchorid;
+                    option.value = data.data[i].anchorid;
+                    var x = document.getElementById("anchor");
+                    x.add(option)
+            }});
+        }
+    }
+</script>
+
+</body>
+</html>
